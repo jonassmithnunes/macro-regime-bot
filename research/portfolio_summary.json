@@ -1,0 +1,49 @@
+{
+  "as_of": "2026-11-27",
+  "portfolio": {
+    "Gold Only + BIL": {
+      "total_return_pct": 576.02,
+      "cagr_pct": 10.18,
+      "volatility_pct": 16.15,
+      "sharpe": 0.68,
+      "sortino": 0.98,
+      "max_drawdown_pct": -30.62,
+      "calmar": 0.33,
+      "worst_year_pct": -11.11,
+      "best_year_pct": 51.37
+    },
+    "Regime Basket + SMA": {
+      "total_return_pct": 187.67,
+      "cagr_pct": 5.61,
+      "volatility_pct": 12.71,
+      "sharpe": 0.49,
+      "sortino": 0.68,
+      "max_drawdown_pct": -25.98,
+      "calmar": 0.22,
+      "worst_year_pct": -11.51,
+      "best_year_pct": 30.42
+    },
+    "Buy & Hold GLD": {
+      "total_return_pct": 403.30,
+      "cagr_pct": 8.54,
+      "volatility_pct": 18.27,
+      "sharpe": 0.54,
+      "sortino": 0.76,
+      "max_drawdown_pct": -45.56,
+      "calmar": 0.19,
+      "worst_year_pct": -28.33,
+      "best_year_pct": 63.68
+    },
+    "Buy & Hold DBC": {
+      "total_return_pct": 45.16,
+      "cagr_pct": 1.91,
+      "volatility_pct": 19.26,
+      "sharpe": 0.19,
+      "sortino": 0.27,
+      "max_drawdown_pct": -76.36,
+      "calmar": 0.02,
+      "worst_year_pct": -31.80,
+      "best_year_pct": 41.36
+    }
+  }
+}

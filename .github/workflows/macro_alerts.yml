@@ -1,0 +1,72 @@
+name: Macro Inflection Alerts
+
+on:
+  schedule:
+    - cron: "30 15 * * 1-5"
+    - cron: "30 20 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "Select report to send to Telegram"
+        type: choice
+        required: true
+        default: "run"
+        options:
+          - run
+          - gold
+          - forecast
+          - regime
+          - assets
+          - macro
+          - help
+          - scheduled
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macro-alert-state
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+
+      - name: Restore private alert state
+        if: github.event_name == 'schedule' || github.event.inputs.command == 'scheduled'
+        uses: actions/cache@v4
+        with:
+          path: data/last_state.json
+          key: macro-alert-state-${{ github.run_id }}
+          restore-keys: |
+            macro-alert-state-
+
+      - name: Run stateful macro monitor
+        env:
+          PYTHONPATH: src
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            PYTHONPATH=src python alert_monitor.py --command scheduled
+          else
+            PYTHONPATH=src python alert_monitor.py --command "${{ github.event.inputs.command }}"
+          fi
