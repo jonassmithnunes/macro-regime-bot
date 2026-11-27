@@ -1,3 +1,4 @@
+-e .
 fredapi>=0.5.2
 numpy>=1.22
 pandas>=2.0
