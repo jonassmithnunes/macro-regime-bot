@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import sys
 from dataclasses import dataclass
@@ -24,6 +25,71 @@ GOLD_MARKET_TICKERS = ("UUP", "GLD", "SLV")
 GOLD_FRED_TICKERS = ("DFII10", "DGS2")
 
 
+def _clamp_progress(value: float) -> float:
+    """Clamp every factor score to the public zero-to-one interval."""
+    return 0.0 if not math.isfinite(value) else max(0.0, min(1.0, value))
+
+
+def trailing_streak(condition: pd.Series, limit: int = 3) -> int:
+    """Count consecutive true observations at the end of a condition series."""
+    streak = 0
+    for value in reversed(condition.fillna(False).to_numpy(dtype=bool)):
+        if not value:
+            break
+        streak += 1
+        if streak >= limit:
+            break
+    return streak
+
+
+def real_yield_progress(
+    current: float,
+    sma: float,
+    change_10d: float,
+    streak_days: int,
+) -> float:
+    """Score DFII10 distance, confirmation streak, and rolling-yield trigger."""
+    target = sma - 0.03
+    if streak_days >= 3 and change_10d < 0:
+        return 1.0
+    if 1 <= streak_days < 3:
+        return _clamp_progress(0.90 + 0.04 * streak_days)
+    distance_above = current - target
+    return _clamp_progress(0.89 * (1.0 - distance_above / 0.40))
+
+
+def dollar_progress(current: float, sma: float, streak_days: int) -> float:
+    """Score UUP distance to its buffered 20-day dollar-breakdown trigger."""
+    target = sma * 0.9975
+    if streak_days >= 3:
+        return 1.0
+    if 1 <= streak_days < 3:
+        return _clamp_progress(0.90 + 0.04 * streak_days)
+    if target <= 0:
+        return 0.0
+    distance_above = (current - target) / target
+    return _clamp_progress(0.89 * (1.0 - distance_above / 0.03))
+
+
+def front_end_progress(current: float, sma: float) -> float:
+    """Score DGS2 proximity to a close below its 50-day average."""
+    if current < sma:
+        return 1.0
+    return _clamp_progress(0.95 * (1.0 - (current - sma) / 0.50))
+
+
+def gold_trend_progress(current: float, sma: float, roc_10d: float) -> float:
+    """Score GLD trend proximity, momentum, and confirmed trend reclamation."""
+    if current > sma and roc_10d > 0:
+        return 1.0
+    if current > sma:
+        return 0.92
+    if sma <= 0:
+        return 0.0
+    distance_below = (sma - current) / sma
+    return _clamp_progress(0.90 * (1.0 - distance_below / 0.15))
+
+
 @dataclass(frozen=True)
 class GoldSignal:
     """One Gold catalyst with its current, SMA, and ten-day values."""
@@ -32,6 +98,7 @@ class GoldSignal:
     current: float
     sma: float
     change_10d: float
+    progress: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -141,30 +208,55 @@ class GoldMonitor:
         dollar = self._signal(self.markets["UUP"], 20, True)
         front_end = self._signal(self.fred["DGS2"], 50, False)
         gold = self._signal(self.markets["GLD"], 50, True)
+        real_condition = self.fred["DFII10"] <= (
+            self.fred["DFII10"].rolling(50).mean() - 0.03
+        )
+        dollar_condition = self.markets["UUP"] <= (
+            self.markets["UUP"].rolling(20).mean() * 0.9975
+        )
+        real_streak = trailing_streak(real_condition)
+        dollar_streak = trailing_streak(dollar_condition)
         signals = {
             "real_yields": GoldSignal(
                 real_yield.current < real_yield.sma and real_yield.change_10d < 0,
                 real_yield.current,
                 real_yield.sma,
                 real_yield.change_10d,
+                real_yield_progress(
+                    real_yield.current,
+                    real_yield.sma,
+                    real_yield.change_10d,
+                    real_streak,
+                ),
             ),
             "dollar": GoldSignal(
                 dollar.current < dollar.sma,
                 dollar.current,
                 dollar.sma,
                 dollar.change_10d,
+                dollar_progress(
+                    dollar.current,
+                    dollar.sma,
+                    dollar_streak,
+                ),
             ),
             "fed_pivot": GoldSignal(
                 front_end.current < front_end.sma,
                 front_end.current,
                 front_end.sma,
                 front_end.change_10d,
+                front_end_progress(front_end.current, front_end.sma),
             ),
             "gold_technical": GoldSignal(
                 gold.current > gold.sma and gold.change_10d > 0,
                 gold.current,
                 gold.sma,
                 gold.change_10d,
+                gold_trend_progress(
+                    gold.current,
+                    gold.sma,
+                    gold.change_10d,
+                ),
             ),
         }
 

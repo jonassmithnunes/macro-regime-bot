@@ -1,7 +1,7 @@
 # Macro Regime & Quantitative Gold Research Engine
 
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
-[![pytest](https://img.shields.io/badge/pytest-67_passed-brightgreen.svg)](tests/)
+[![pytest](https://img.shields.io/badge/pytest-71_passed-brightgreen.svg)](tests/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Support-orange.svg)](https://buymeacoffee.com)
 

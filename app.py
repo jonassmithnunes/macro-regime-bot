@@ -17,7 +17,7 @@ import streamlit as st
 from asset_playbook import AssetPlaybook
 from backtest import compute_strict_gold_filter
 from dashboard import collect_asset_momentum, run_regime_engines
-from gold_monitor import GoldMonitor
+from gold_monitor import GoldMonitor, trailing_streak
 
 
 ROOT = Path(__file__).parent
@@ -69,12 +69,18 @@ def load_live_research(api_key: str) -> Dict[str, Any]:
     )
     real_confirmed = real_buffer.rolling(3).sum() == 3
     dollar_confirmed = dollar_buffer.rolling(3).sum() == 3
+    real_streak = trailing_streak(real_buffer)
+    dollar_streak = trailing_streak(dollar_buffer)
     latest = components.index[-1]
 
-    def macro_status(component: str, confirmed: pd.Series) -> str:
+    def macro_status(
+        component: str,
+        confirmed: pd.Series,
+        streak: int,
+    ) -> str:
         if bool(components.loc[latest, component]) and bool(confirmed.loc[latest]):
             return "ACTIVE"
-        if bool(components.loc[latest, component]):
+        if bool(components.loc[latest, component]) or 1 <= streak < 3:
             return "PENDING"
         return "INACTIVE"
 
@@ -82,17 +88,27 @@ def load_live_research(api_key: str) -> Dict[str, Any]:
         {
             "name": "DFII10 Real Yield",
             "value": f"{real.iloc[-1]:.2f}% vs 50D {real_sma.iloc[-1]:.2f}%",
-            "status": macro_status("real_yields", real_confirmed),
+            "status": macro_status(
+                "real_yields",
+                real_confirmed,
+                real_streak,
+            ),
+            "streak": real_streak,
+            "progress": assessment.signals["real_yields"].progress,
         },
         {
             "name": "UUP Dollar",
             "value": f"${dollar.iloc[-1]:.2f} vs 20D ${dollar_sma.iloc[-1]:.2f}",
-            "status": macro_status("dollar", dollar_confirmed),
+            "status": macro_status("dollar", dollar_confirmed, dollar_streak),
+            "streak": dollar_streak,
+            "progress": assessment.signals["dollar"].progress,
         },
         {
             "name": "DGS2 2Y Yield",
             "value": f"{front.iloc[-1]:.2f}% vs 50D {front_sma.iloc[-1]:.2f}%",
             "status": "ACTIVE" if components.loc[latest, "fed_pivot"] else "INACTIVE",
+            "streak": 0,
+            "progress": assessment.signals["fed_pivot"].progress,
         },
         {
             "name": "GLD Technical Trend",
@@ -104,6 +120,8 @@ def load_live_research(api_key: str) -> Dict[str, Any]:
                 if gold_roc.iloc[-1] > 0
                 else "INACTIVE"
             ),
+            "streak": 0,
+            "progress": assessment.signals["gold_technical"].progress,
         },
     ]
     return {
@@ -135,7 +153,8 @@ def load_research_artifacts() -> Dict[str, Any]:
 def status_badge(status: str) -> str:
     """Return a consistently colored Streamlit Markdown status badge."""
     colors = {"ACTIVE": "green", "PENDING": "orange", "INACTIVE": "red"}
-    return f":{colors[status]}[**{status}**]"
+    status_type = status.split(" ", maxsplit=1)[0]
+    return f":{colors[status_type]}[**{status}**]"
 
 
 def render_live_tab() -> None:
@@ -166,17 +185,35 @@ def render_live_tab() -> None:
     columns[2].metric("Transition Path", f"{current} → {forward.regime}")
 
     st.subheader("Strict 4-Factor Gold Bounce Monitor")
+    composite_progress = sum(
+        factor["progress"] for factor in live["factors"]
+    ) / len(live["factors"])
+    st.progress(
+        composite_progress,
+        text=f"Composite Inflection Readiness — {composite_progress:.0%}",
+    )
     st.metric(
         "Gold Readiness",
         live["gold_readiness"],
         f"{live['gold_score']}/4 strict factors active",
     )
-    factor_columns = st.columns(4)
-    for column, factor in zip(factor_columns, live["factors"]):
-        with column:
-            st.markdown(f"**{factor['name']}**")
-            st.markdown(status_badge(factor["status"]))
-            st.caption(factor["value"])
+    for row in range(2):
+        factor_columns = st.columns(2)
+        for column, factor in zip(
+            factor_columns,
+            live["factors"][row * 2 : row * 2 + 2],
+        ):
+            with column:
+                status = factor["status"]
+                if status == "PENDING" and factor["streak"] > 0:
+                    status = f"PENDING (Day {factor['streak']}/3)"
+                st.markdown(f"**{factor['name']}**")
+                st.markdown(status_badge(status))
+                st.caption(factor["value"])
+                st.progress(
+                    factor["progress"],
+                    text=f"{int(factor['progress'] * 100)}% to trigger",
+                )
     st.caption(f"GLD / SLV 20-day leadership change: {live['gold_silver_20d']:+.2f}%")
 
     st.subheader("Asset Allocation Playbook")
