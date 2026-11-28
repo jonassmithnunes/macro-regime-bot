@@ -315,6 +315,13 @@ def render_research_tab() -> None:
     st.subheader("Parameter Perturbation Robustness Matrix")
     matrix = pd.DataFrame(validation["robustness"]["matrix"])
     st.dataframe(matrix, use_container_width=True)
+    st.info(
+        "**Research Interpretation:** While the system achieves a **71.3% "
+        "6-month win rate in the modern TIPS/ETF era (2007–2026)** and shows "
+        "smooth parameter stability across `40d–60d` windows, 50-year testing "
+        "(`1976–2026`) reveals regime sensitivity during the 1981–2000 secular "
+        "Gold bear market (`~62%–64.7%` win rate)."
+    )
     st.metric("Stability Score", validation["robustness"]["stability_score"])
     st.caption(
         "Each matrix cell reports 126-day win rate / median return / valid trades."

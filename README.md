@@ -68,6 +68,8 @@ The frozen strict rules were evaluated on blind 1976–2006 data, modern 2007+ d
 | 55d | 63.18% | 63.44% | 64.71% |
 | 60d | 63.60% | 63.56% | 64.55% |
 
+> **Research Interpretation:** While the system achieves a **71.3% 6-month win rate in the modern TIPS/ETF era (2007–2026)** and shows smooth parameter stability across `40d–60d` windows, 50-year testing (`1976–2026`) reveals regime sensitivity during the 1981–2000 secular Gold bear market (`~62%–64.7%` win rate).
+
 ## Interactive Web Dashboard
 
 The Streamlit application provides:
